@@ -77,7 +77,9 @@ dependencies {
 // Task to copy the template APK to the app's assets folder
 tasks.register<Copy>("copyTemplateApk") {
     dependsOn(":template:assembleRelease")
-    from("${project(":template").layout.buildDirectory.get()}/outputs/apk/release/template-release-unsigned.apk")
+    from("${project(":template").layout.buildDirectory.get()}/outputs/apk/release/") {
+        include("*.apk")
+    }
     into("src/main/assets")
     rename { "base-web-template.apk" }
 }
