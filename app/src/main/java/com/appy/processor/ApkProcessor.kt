@@ -194,10 +194,10 @@ class ApkProcessor(private val context: Context) {
      */
     private suspend fun injectIcon(apkFile: File, iconUri: Uri) = withContext(Dispatchers.IO) {
         try {
-            // Load the source bitmap
-            val inputStream = context.contentResolver.openInputStream(iconUri)
-            val sourceBitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
+            // Load the source bitmap with proper resource handling
+            val sourceBitmap = context.contentResolver.openInputStream(iconUri)?.use { inputStream ->
+                BitmapFactory.decodeStream(inputStream)
+            }
 
             if (sourceBitmap == null) return@withContext
 

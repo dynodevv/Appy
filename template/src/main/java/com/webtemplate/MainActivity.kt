@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.view.View
-import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -12,6 +11,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ProgressBar
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import org.json.JSONObject
@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(rootLayout)
         
         setupWebView()
+        setupBackNavigation()
         loadUrlFromConfig()
     }
 
@@ -105,6 +106,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupBackNavigation() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
+    }
+
     private fun loadUrlFromConfig() {
         try {
             val configStream = assets.open("config.json")
@@ -125,16 +139,6 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             // Fallback URL if config loading fails
             webView.loadUrl("https://example.com")
-        }
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            @Suppress("DEPRECATION")
-            super.onBackPressed()
         }
     }
 }

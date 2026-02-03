@@ -93,6 +93,19 @@ sealed class BuildState {
 }
 
 /**
+ * Validates if a package ID follows Android naming conventions
+ */
+private fun isValidPackageId(packageId: String): Boolean {
+    if (packageId.isBlank()) return false
+    // Package ID must have at least two parts separated by dots
+    val parts = packageId.split(".")
+    if (parts.size < 2) return false
+    // Each part must start with a letter and contain only letters, digits, and underscores
+    val partPattern = Regex("^[a-z][a-z0-9_]*$")
+    return parts.all { it.isNotEmpty() && partPattern.matches(it) }
+}
+
+/**
  * Home screen implementing Material 3 Expressive design principles
  * Features:
  * - Glass-effect TopAppBar with blur
@@ -112,6 +125,9 @@ fun HomeScreen(
     var iconUri by remember { mutableStateOf<Uri?>(null) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val scrollState = rememberScrollState()
+    
+    // Validation states
+    val isPackageIdValid = isValidPackageId(packageId)
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -246,6 +262,10 @@ fun HomeScreen(
                             )
                         },
                         singleLine = true,
+                        isError = packageId.isNotBlank() && !isPackageIdValid,
+                        supportingText = if (packageId.isNotBlank() && !isPackageIdValid) {
+                            { Text("Use lowercase letters, numbers, underscores (e.g., com.example.app)") }
+                        } else null,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Ascii,
                             imeAction = ImeAction.Done
@@ -302,7 +322,7 @@ fun HomeScreen(
                     // Primary Compound Action Button for Build
                     PrimaryCompoundActionButton(
                         text = "Build APK",
-                        enabled = url.isNotBlank() && appName.isNotBlank() && buildState is BuildState.Idle,
+                        enabled = url.isNotBlank() && appName.isNotBlank() && isPackageIdValid && buildState is BuildState.Idle,
                         onClick = {
                             onBuildClick(
                                 ApkConfig(
