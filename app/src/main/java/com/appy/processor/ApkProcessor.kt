@@ -1,6 +1,9 @@
 package com.appy.processor
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -11,8 +14,8 @@ import net.lingala.zip4j.model.ZipParameters
 import net.lingala.zip4j.model.enums.CompressionLevel
 import net.lingala.zip4j.model.enums.CompressionMethod
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.security.KeyStore
 import java.security.PrivateKey
@@ -37,7 +40,8 @@ sealed class ApkProcessingResult {
  * Implements "Binary Template Modification" strategy:
  * 1. Opens pre-compiled base-web-template.apk from assets
  * 2. Modifies assets/config.json with user's URL
- * 3. Signs the modified APK using bundled keystore
+ * 3. Injects custom icon if provided
+ * 4. Signs the modified APK using bundled keystore
  */
 class ApkProcessor(private val context: Context) {
 
@@ -48,13 +52,27 @@ class ApkProcessor(private val context: Context) {
         private const val KEYSTORE_PASSWORD = "android"
         private const val KEY_ALIAS = "androiddebugkey"
         private const val OUTPUT_DIR = "generated_apks"
+        
+        // Icon sizes for different densities
+        private val ICON_SIZES = mapOf(
+            "res/mipmap-mdpi/ic_launcher.png" to 48,
+            "res/mipmap-hdpi/ic_launcher.png" to 72,
+            "res/mipmap-xhdpi/ic_launcher.png" to 96,
+            "res/mipmap-xxhdpi/ic_launcher.png" to 144,
+            "res/mipmap-xxxhdpi/ic_launcher.png" to 192
+        )
     }
 
     /**
-     * Generates an APK from the template with the specified URL
+     * Generates an APK from the template with the specified configuration
      * Emits progress updates as Flow
      */
-    fun generateApk(url: String, appName: String = "WebApp"): Flow<ApkProcessingResult> = flow {
+    fun generateApk(
+        url: String,
+        appName: String = "WebApp",
+        packageId: String = "com.webapp.app",
+        iconUri: Uri? = null
+    ): Flow<ApkProcessingResult> = flow {
         try {
             emit(ApkProcessingResult.Progress(0.1f, "Preparing template..."))
 
@@ -70,12 +88,19 @@ class ApkProcessor(private val context: Context) {
             emit(ApkProcessingResult.Progress(0.3f, "Modifying configuration..."))
 
             // Step 3: Modify the APK (inject config.json)
-            modifyApk(templateFile, outputFile, url, appName)
-            emit(ApkProcessingResult.Progress(0.6f, "Configuration injected"))
+            modifyApk(templateFile, outputFile, url, appName, packageId)
+            emit(ApkProcessingResult.Progress(0.5f, "Configuration injected"))
 
-            emit(ApkProcessingResult.Progress(0.7f, "Signing APK..."))
+            // Step 4: Inject custom icon if provided
+            if (iconUri != null) {
+                emit(ApkProcessingResult.Progress(0.6f, "Injecting custom icon..."))
+                injectIcon(outputFile, iconUri)
+            }
+            emit(ApkProcessingResult.Progress(0.7f, "Icon processed"))
 
-            // Step 4: Sign the APK
+            emit(ApkProcessingResult.Progress(0.8f, "Signing APK..."))
+
+            // Step 5: Sign the APK
             val signedApk = signApk(outputFile)
             emit(ApkProcessingResult.Progress(0.9f, "APK signed"))
 
@@ -117,22 +142,24 @@ class ApkProcessor(private val context: Context) {
     }
 
     /**
-     * Modifies the APK template by injecting the config.json with user's URL
+     * Modifies the APK template by injecting the config.json with user's URL and settings
      * Uses Zip4j library for ZIP manipulation
      */
     private suspend fun modifyApk(
         templateFile: File,
         outputFile: File,
         url: String,
-        appName: String
+        appName: String,
+        packageId: String
     ) = withContext(Dispatchers.IO) {
         // Copy template to output location
         templateFile.copyTo(outputFile, overwrite = true)
 
-        // Create config.json content
+        // Create config.json content with all settings
         val configJson = JSONObject().apply {
             put("url", url)
             put("appName", appName)
+            put("packageId", packageId)
             put("generatedAt", System.currentTimeMillis())
             put("version", "1.0")
         }
@@ -159,6 +186,62 @@ class ApkProcessor(private val context: Context) {
             }
         } finally {
             configFile.delete()
+        }
+    }
+
+    /**
+     * Injects custom icon into the APK at various densities
+     */
+    private suspend fun injectIcon(apkFile: File, iconUri: Uri) = withContext(Dispatchers.IO) {
+        try {
+            // Load the source bitmap
+            val inputStream = context.contentResolver.openInputStream(iconUri)
+            val sourceBitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream?.close()
+
+            if (sourceBitmap == null) return@withContext
+
+            ZipFile(apkFile).use { zipFile ->
+                ICON_SIZES.forEach { (path, size) ->
+                    // Scale bitmap to target size
+                    val scaledBitmap = Bitmap.createScaledBitmap(sourceBitmap, size, size, true)
+                    
+                    // Convert to PNG bytes
+                    val outputStream = ByteArrayOutputStream()
+                    scaledBitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+                    val pngBytes = outputStream.toByteArray()
+                    
+                    // Write to temp file
+                    val tempFile = File(context.cacheDir, "icon_${size}.png")
+                    tempFile.writeBytes(pngBytes)
+                    
+                    try {
+                        // Remove existing icon if present
+                        if (zipFile.getFileHeader(path) != null) {
+                            zipFile.removeFile(path)
+                        }
+                        
+                        // Add new icon
+                        val zipParams = ZipParameters().apply {
+                            compressionMethod = CompressionMethod.DEFLATE
+                            compressionLevel = CompressionLevel.NORMAL
+                            fileNameInZip = path
+                        }
+                        
+                        zipFile.addFile(tempFile, zipParams)
+                    } finally {
+                        tempFile.delete()
+                    }
+                    
+                    if (scaledBitmap != sourceBitmap) {
+                        scaledBitmap.recycle()
+                    }
+                }
+            }
+
+            sourceBitmap.recycle()
+        } catch (e: Exception) {
+            // Icon injection is optional, continue if it fails
         }
     }
 
@@ -255,7 +338,7 @@ class ApkProcessor(private val context: Context) {
         jarOut: JarOutputStream,
         manifest: Manifest,
         privateKey: PrivateKey,
-        certificate: X509Certificate
+        @Suppress("UNUSED_PARAMETER") certificate: X509Certificate
     ) {
         // Add MANIFEST.MF
         val manifestEntry = JarEntry("META-INF/MANIFEST.MF")

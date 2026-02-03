@@ -34,11 +34,16 @@ class MainActivity : ComponentActivity() {
 
                 HomeScreen(
                     buildState = buildState,
-                    onBuildClick = { url ->
+                    onBuildClick = { config ->
                         scope.launch {
                             buildState = BuildState.Building(0f, "Starting...")
 
-                            apkProcessor.generateApk(url).collect { result ->
+                            apkProcessor.generateApk(
+                                url = config.url,
+                                appName = config.appName,
+                                packageId = config.packageId,
+                                iconUri = config.iconUri
+                            ).collect { result ->
                                 when (result) {
                                     is ApkProcessingResult.Progress -> {
                                         buildState = BuildState.Building(
