@@ -6,9 +6,9 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
-import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsetsController;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -17,124 +17,158 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
-
-import org.json.JSONObject;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
 /**
- * Pure Java WebView activity with zero external dependencies.
- * Reads configuration from assets/config.json.
+ * Ultra-minimal WebView activity with zero external dependencies.
+ * Reads URL from assets/config.json at startup.
  */
 public class MainActivity extends Activity {
 
     private WebView webView;
     private ProgressBar progressBar;
+    private String targetUrl = "https://example.com";
+    private boolean statusBarDark = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Load config first to get status bar settings
-        JSONObject config = loadConfig();
-        boolean statusBarDark = config.optBoolean("statusBarDark", false);
-
-        // Set status bar appearance based on config
-        setupStatusBar(statusBarDark);
-
-        // Create layout programmatically (no XML dependencies)
-        FrameLayout rootLayout = new FrameLayout(this);
-        rootLayout.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-        ));
-
-        // Set background color to match status bar
-        if (statusBarDark) {
-            rootLayout.setBackgroundColor(Color.parseColor("#1C1B1F"));
-        } else {
-            rootLayout.setBackgroundColor(Color.parseColor("#F5F5F5"));
+        
+        try {
+            // Load configuration from config.json
+            loadConfig();
+            
+            // Setup status bar
+            setupStatusBar();
+            
+            // Create UI
+            createUI();
+            
+            // Setup WebView
+            setupWebView();
+            
+            // Load URL
+            webView.loadUrl(targetUrl);
+        } catch (Exception e) {
+            // Show error as toast and show a fallback URL
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            if (webView != null) {
+                webView.loadUrl("https://example.com");
+            }
         }
-
-        // Enable fitsSystemWindows for proper status bar handling
-        rootLayout.setFitsSystemWindows(true);
-
-        // Create WebView
-        webView = new WebView(this);
-        webView.setLayoutParams(new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-        ));
-
-        // Create ProgressBar
-        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                8
-        );
-        progressParams.gravity = Gravity.TOP;
-        progressBar.setLayoutParams(progressParams);
-        progressBar.setIndeterminate(false);
-        progressBar.setMax(100);
-
-        rootLayout.addView(webView);
-        rootLayout.addView(progressBar);
-        setContentView(rootLayout);
-
-        setupWebView();
-
-        // Load URL from config
-        String url = config.optString("url", "https://example.com");
-        webView.loadUrl(url);
+    }
+    
+    private void loadConfig() {
+        try {
+            InputStream inputStream = getAssets().open("config.json");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            StringBuilder stringBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                stringBuilder.append(line);
+            }
+            reader.close();
+            inputStream.close();
+            
+            String jsonString = stringBuilder.toString();
+            
+            // Simple JSON parsing without using JSONObject to avoid any potential issues
+            // Parse "url" field
+            int urlIndex = jsonString.indexOf("\"url\"");
+            if (urlIndex >= 0) {
+                int colonIndex = jsonString.indexOf(":", urlIndex);
+                int startQuote = jsonString.indexOf("\"", colonIndex);
+                int endQuote = jsonString.indexOf("\"", startQuote + 1);
+                if (startQuote >= 0 && endQuote > startQuote) {
+                    targetUrl = jsonString.substring(startQuote + 1, endQuote);
+                }
+            }
+            
+            // Parse "statusBarDark" field
+            int statusIndex = jsonString.indexOf("\"statusBarDark\"");
+            if (statusIndex >= 0) {
+                int colonIndex = jsonString.indexOf(":", statusIndex);
+                String afterColon = jsonString.substring(colonIndex + 1).trim();
+                statusBarDark = afterColon.startsWith("true");
+            }
+        } catch (Exception e) {
+            // Use defaults if config loading fails
+            targetUrl = "https://example.com";
+            statusBarDark = false;
+        }
     }
 
-    private void setupStatusBar(boolean statusBarDark) {
+    private void setupStatusBar() {
+        // Set status bar color
+        int statusBarColor = statusBarDark ? Color.parseColor("#1C1B1F") : Color.parseColor("#F5F5F5");
+        getWindow().setStatusBarColor(statusBarColor);
+        
+        // Set status bar icon color
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsetsController controller = getWindow().getInsetsController();
             if (controller != null) {
                 if (statusBarDark) {
-                    // Dark status bar with light icons
-                    controller.setSystemBarsAppearance(
-                            0,
-                            WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                    );
-                    getWindow().setStatusBarColor(Color.parseColor("#1C1B1F"));
+                    // Dark background, light icons
+                    controller.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
                 } else {
-                    // Light status bar with dark icons
+                    // Light background, dark icons
                     controller.setSystemBarsAppearance(
-                            WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
-                            WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
+                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
                     );
-                    getWindow().setStatusBarColor(Color.parseColor("#F5F5F5"));
                 }
             }
         } else {
+            View decorView = getWindow().getDecorView();
+            int flags = decorView.getSystemUiVisibility();
             if (statusBarDark) {
-                getWindow().setStatusBarColor(Color.parseColor("#1C1B1F"));
-                getWindow().getDecorView().setSystemUiVisibility(0);
+                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             } else {
-                getWindow().setStatusBarColor(Color.parseColor("#F5F5F5"));
-                getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
             }
+            decorView.setSystemUiVisibility(flags);
         }
     }
-
-    private JSONObject loadConfig() {
-        try {
-            InputStream configStream = getAssets().open("config.json");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(configStream));
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                sb.append(line);
-            }
-            reader.close();
-            return new JSONObject(sb.toString());
-        } catch (Exception e) {
-            return new JSONObject();
-        }
+    
+    private void createUI() {
+        // Create root FrameLayout
+        FrameLayout rootLayout = new FrameLayout(this);
+        rootLayout.setLayoutParams(new ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        
+        // Set background color matching status bar
+        int backgroundColor = statusBarDark ? Color.parseColor("#1C1B1F") : Color.parseColor("#F5F5F5");
+        rootLayout.setBackgroundColor(backgroundColor);
+        rootLayout.setFitsSystemWindows(true);
+        
+        // Create WebView
+        webView = new WebView(this);
+        webView.setLayoutParams(new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+        
+        // Create ProgressBar
+        progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            8
+        );
+        progressBar.setLayoutParams(progressParams);
+        progressBar.setMax(100);
+        progressBar.setProgress(0);
+        
+        // Add views
+        rootLayout.addView(webView);
+        rootLayout.addView(progressBar);
+        
+        setContentView(rootLayout);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -156,33 +190,39 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return false; // Load all URLs in WebView
+                return false;
             }
 
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                progressBar.setVisibility(View.VISIBLE);
+                if (progressBar != null) {
+                    progressBar.setVisibility(View.VISIBLE);
+                }
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                progressBar.setVisibility(View.GONE);
+                if (progressBar != null) {
+                    progressBar.setVisibility(View.GONE);
+                }
             }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
-                progressBar.setProgress(newProgress);
+                if (progressBar != null) {
+                    progressBar.setProgress(newProgress);
+                }
             }
         });
     }
 
     @Override
     public void onBackPressed() {
-        if (webView.canGoBack()) {
+        if (webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
             super.onBackPressed();
@@ -191,7 +231,7 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && webView != null && webView.canGoBack()) {
             webView.goBack();
             return true;
         }
