@@ -10,6 +10,10 @@ Turn any website into an APK, with a simple and easy-to-use UI.
 - **Binary Template Modification**: Uses pre-compiled WebView template for fast APK generation without Gradle
 - **Automatic Signing**: APKs are signed and ready for installation
 
+## Known issues
+
+- Custom icons don't work
+
 ## Technical Overview
 
 ### Architecture
