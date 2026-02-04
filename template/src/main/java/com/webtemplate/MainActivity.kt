@@ -13,7 +13,10 @@ import android.widget.FrameLayout
 import android.widget.ProgressBar
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -26,7 +29,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Enable edge-to-edge
+        // Enable edge-to-edge but we'll handle insets manually
         WindowCompat.setDecorFitsSystemWindows(window, false)
         
         // Create layout programmatically
@@ -60,6 +63,16 @@ class MainActivity : AppCompatActivity() {
         rootLayout.addView(webView)
         rootLayout.addView(progressBar)
         setContentView(rootLayout)
+        
+        // Apply window insets to avoid content behind status bar and navigation bar
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(
+                top = insets.top,
+                bottom = insets.bottom
+            )
+            windowInsets
+        }
         
         setupWebView()
         setupBackNavigation()

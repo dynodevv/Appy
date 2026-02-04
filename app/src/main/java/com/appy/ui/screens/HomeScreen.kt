@@ -102,6 +102,12 @@ sealed class BuildState {
 private const val MAX_PACKAGE_ID_LENGTH = 44
 
 /**
+ * Maximum app name length - must be <= template app name length
+ * Template uses "AppyGeneratedWebApplicationPlaceholderNameHere" (46 chars)
+ */
+private const val MAX_APP_NAME_LENGTH = 46
+
+/**
  * Validates if a package ID follows Android naming conventions
  */
 private fun isValidPackageId(packageId: String): Boolean {
@@ -114,6 +120,15 @@ private fun isValidPackageId(packageId: String): Boolean {
     // Each part must start with a letter and contain only letters, digits, and underscores
     val partPattern = Regex("^[a-z][a-z0-9_]*$")
     return parts.all { it.isNotEmpty() && partPattern.matches(it) }
+}
+
+/**
+ * Validates if an app name is valid
+ */
+private fun isValidAppName(appName: String): Boolean {
+    if (appName.isBlank()) return false
+    if (appName.length > MAX_APP_NAME_LENGTH) return false
+    return true
 }
 
 /**
@@ -139,6 +154,7 @@ fun HomeScreen(
     
     // Validation states
     val isPackageIdValid = isValidPackageId(packageId)
+    val isAppNameValid = isValidAppName(appName)
 
     // Image picker launcher
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -248,6 +264,12 @@ fun HomeScreen(
                             )
                         },
                         singleLine = true,
+                        isError = appName.isNotBlank() && !isAppNameValid,
+                        supportingText = if (appName.isNotBlank() && !isAppNameValid) {
+                            { 
+                                Text("App name too long (max $MAX_APP_NAME_LENGTH chars)") 
+                            }
+                        } else null,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Text,
                             imeAction = ImeAction.Next
@@ -337,7 +359,7 @@ fun HomeScreen(
                         }
                     }
 
-                    // Info note about limitations
+                    // Info note about customization
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -356,7 +378,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Your custom package ID allows multiple apps to be installed. The app name is used for the filename and shown inside the app.",
+                            text = "Your custom app name, package ID, and icon will be applied to the generated APK. Each unique package ID allows a separate app installation.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -365,7 +387,7 @@ fun HomeScreen(
                     // Primary Compound Action Button for Build
                     PrimaryCompoundActionButton(
                         text = "Build APK",
-                        enabled = url.isNotBlank() && appName.isNotBlank() && isPackageIdValid && buildState is BuildState.Idle,
+                        enabled = url.isNotBlank() && isAppNameValid && isPackageIdValid && buildState is BuildState.Idle,
                         onClick = {
                             onBuildClick(
                                 ApkConfig(

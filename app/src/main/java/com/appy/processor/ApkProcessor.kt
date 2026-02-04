@@ -46,12 +46,16 @@ class ApkProcessor(private val context: Context) {
         private const val TEMPLATE_APK = "base-web-template.apk"
         private const val CONFIG_FILE = "assets/config.json"
         private const val MANIFEST_FILE = "AndroidManifest.xml"
+        private const val RESOURCES_FILE = "resources.arsc"
         private const val KEYSTORE_FILE = "debug.p12"
         private const val KEYSTORE_PASSWORD = "android"
         private const val KEY_ALIAS = "androiddebugkey"
         
         // Template package ID - must match the applicationId in template/build.gradle.kts
         private const val TEMPLATE_PACKAGE_ID = "com.appy.generated.webapp.placeholder.app"
+        
+        // Template app name - must match the app_name string in template/res/values/strings.xml
+        private const val TEMPLATE_APP_NAME = "AppyGeneratedWebApplicationPlaceholderNameHere"
         
         // Icon sizes for different densities
         private val ICON_SIZES = mapOf(
@@ -168,6 +172,7 @@ class ApkProcessor(private val context: Context) {
      * Modifies the APK template by:
      * 1. Injecting config.json with user's URL and settings
      * 2. Modifying AndroidManifest.xml to change the package name
+     * 3. Modifying resources.arsc to change the app name
      * Uses Zip4j library for ZIP manipulation
      */
     private suspend fun modifyApk(
@@ -244,6 +249,41 @@ class ApkProcessor(private val context: Context) {
                     }
                 } else {
                     throw IllegalStateException("AndroidManifest.xml not found in template APK")
+                }
+                
+                // Modify resources.arsc to change app name
+                val resourcesHeader = zipFile.getFileHeader(RESOURCES_FILE)
+                if (resourcesHeader != null) {
+                    // Extract resources bytes
+                    val resourcesBytes = zipFile.getInputStream(resourcesHeader).use { it.readBytes() }
+                    
+                    // Modify the app name in the binary resources
+                    val modifiedResources = BinaryResourcesModifier.modifyString(
+                        resourcesBytes,
+                        TEMPLATE_APP_NAME,
+                        appName
+                    )
+                    
+                    // Write modified resources to temp file
+                    val resourcesTempFile = File(context.cacheDir, "resources.arsc")
+                    resourcesTempFile.writeBytes(modifiedResources)
+                    
+                    try {
+                        // Remove old resources
+                        zipFile.removeFile(RESOURCES_FILE)
+                        
+                        // Add modified resources - resources.arsc is stored uncompressed
+                        val resourcesParams = ZipParameters().apply {
+                            compressionMethod = CompressionMethod.STORE
+                            fileNameInZip = RESOURCES_FILE
+                        }
+                        
+                        zipFile.addFile(resourcesTempFile, resourcesParams)
+                    } finally {
+                        resourcesTempFile.delete()
+                    }
+                } else {
+                    throw IllegalStateException("resources.arsc not found in template APK")
                 }
             }
         } finally {
