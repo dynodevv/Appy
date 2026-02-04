@@ -6,14 +6,17 @@ import java.nio.ByteOrder
 /**
  * Binary AndroidManifest.xml modifier
  * 
- * Android's compiled AndroidManifest.xml uses a binary format where:
- * - Strings are stored in a string pool at the beginning
- * - The package name is one of these strings
- * - We can find and replace the package name string with a new one
+ * Android's compiled AndroidManifest.xml uses a binary format where strings are stored
+ * in a string pool. For UTF-16 strings (the default), the format is:
+ * - 2 bytes: character count (little-endian, uint16)
+ * - N*2 bytes: UTF-16LE encoded characters
+ * - 2 bytes: null terminator (0x0000)
  * 
- * This implementation performs direct byte replacement, which works when:
- * - The new package name is the same length or shorter than the template
- * - The template package name is long enough to accommodate custom names
+ * To replace a package name, we need to:
+ * 1. Find the UTF-16LE encoded string
+ * 2. Update the character count (2 bytes before the string)
+ * 3. Write the new string data
+ * 4. Ensure proper null termination
  */
 object BinaryManifestModifier {
     
@@ -37,56 +40,61 @@ object BinaryManifestModifier {
             )
         }
         
-        // Simple replacement: find the old package name and replace with new one (padded)
-        val oldBytes = oldPackageName.toByteArray(Charsets.UTF_8)
-        val newBytes = newPackageName.toByteArray(Charsets.UTF_8)
-        
         val result = manifestBytes.copyOf()
-        var replacedUtf8 = false
-        var replacedUtf16 = false
+        var replaced = false
         
-        // Find and replace UTF-8 occurrences
-        var i = 0
-        while (i < result.size - oldBytes.size) {
-            if (matchesAt(result, i, oldBytes)) {
-                // Replace with new bytes, pad with zeros if necessary
-                for (j in newBytes.indices) {
-                    result[i + j] = newBytes[j]
-                }
-                // Pad remaining bytes with zeros
-                for (j in newBytes.size until oldBytes.size) {
-                    result[i + j] = 0
-                }
-                replacedUtf8 = true
-                i += oldBytes.size
-            } else {
-                i++
-            }
-        }
-        
-        // Also handle UTF-16 encoded strings (Android binary XML uses UTF-16 for strings)
+        // Android binary XML primarily uses UTF-16LE for strings in the string pool
         val oldBytesUtf16 = encodeUtf16Le(oldPackageName)
         val newBytesUtf16 = encodeUtf16Le(newPackageName)
         
-        i = 0
+        var i = 0
         while (i < result.size - oldBytesUtf16.size) {
             if (matchesAt(result, i, oldBytesUtf16)) {
-                // Replace with new bytes, pad with zeros if necessary
+                // Found the old package name in UTF-16LE format
+                
+                // Check if there's a valid length prefix 2 bytes before
+                // The length prefix stores character count (not byte count) as uint16 LE
+                if (i >= 2) {
+                    val charCount = (result[i - 2].toInt() and 0xFF) or 
+                                   ((result[i - 1].toInt() and 0xFF) shl 8)
+                    
+                    // Verify this looks like the correct length prefix
+                    if (charCount == oldPackageName.length) {
+                        // Update the character count to the new string length
+                        result[i - 2] = (newPackageName.length and 0xFF).toByte()
+                        result[i - 1] = ((newPackageName.length shr 8) and 0xFF).toByte()
+                    }
+                }
+                
+                // Write the new package name (UTF-16LE encoded)
                 for (j in newBytesUtf16.indices) {
                     result[i + j] = newBytesUtf16[j]
                 }
-                // Pad remaining bytes with zeros (in pairs for UTF-16)
-                for (j in newBytesUtf16.size until oldBytesUtf16.size) {
-                    result[i + j] = 0
+                
+                // Write null terminator immediately after the new string data
+                val nullTermPos = i + newBytesUtf16.size
+                if (nullTermPos + 1 < result.size) {
+                    result[nullTermPos] = 0
+                    result[nullTermPos + 1] = 0
                 }
-                replacedUtf16 = true
-                i += oldBytesUtf16.size
+                
+                // Clear any remaining bytes from the old string (after null terminator)
+                // The old string's null terminator was at oldBytesUtf16.size, so clear from
+                // newBytesUtf16.size + 2 up to oldBytesUtf16.size + 2
+                for (j in (newBytesUtf16.size + 2) until (oldBytesUtf16.size + 2)) {
+                    if (i + j < result.size) {
+                        result[i + j] = 0
+                    }
+                }
+                
+                replaced = true
+                i += oldBytesUtf16.size + 2 // Skip past the replaced string and its null terminator
             } else {
                 i++
             }
         }
         
-        if (!replacedUtf8 && !replacedUtf16) {
+        if (!replaced) {
             throw IllegalStateException("Could not find template package ID in manifest")
         }
         
