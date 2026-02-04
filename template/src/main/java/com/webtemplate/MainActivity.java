@@ -9,15 +9,12 @@ import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowInsetsController;
 import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
-import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -38,45 +35,39 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        try {
-            // Load configuration from config.json
-            loadConfig();
-            
-            // Setup status bar
-            setupStatusBar();
-            
-            // Create UI
-            createUI();
-            
-            // Setup WebView
-            setupWebView();
-            
-            // Load URL
+        // Load configuration FIRST (before any UI)
+        loadConfig();
+        
+        // Create and set content view FIRST before any window operations
+        createUI();
+        
+        // Setup status bar AFTER setContentView
+        setupStatusBar();
+        
+        // Setup WebView
+        setupWebView();
+        
+        // Load URL
+        if (webView != null && targetUrl != null) {
             webView.loadUrl(targetUrl);
-        } catch (Exception e) {
-            // Show error as toast and show a fallback URL
-            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            if (webView != null) {
-                webView.loadUrl("https://example.com");
-            }
         }
     }
     
     private void loadConfig() {
+        InputStream inputStream = null;
+        BufferedReader reader = null;
         try {
-            InputStream inputStream = getAssets().open("config.json");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+            inputStream = getAssets().open("config.json");
+            reader = new BufferedReader(new InputStreamReader(inputStream));
             StringBuilder stringBuilder = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 stringBuilder.append(line);
             }
-            reader.close();
-            inputStream.close();
             
             String jsonString = stringBuilder.toString();
             
-            // Simple JSON parsing without using JSONObject to avoid any potential issues
+            // Simple JSON parsing without using JSONObject
             // Parse "url" field
             int urlIndex = jsonString.indexOf("\"url\"");
             if (urlIndex >= 0) {
@@ -99,38 +90,11 @@ public class MainActivity extends Activity {
             // Use defaults if config loading fails
             targetUrl = "https://example.com";
             statusBarDark = false;
-        }
-    }
-
-    private void setupStatusBar() {
-        // Set status bar color
-        int statusBarColor = statusBarDark ? Color.parseColor("#1C1B1F") : Color.parseColor("#F5F5F5");
-        getWindow().setStatusBarColor(statusBarColor);
-        
-        // Set status bar icon color
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            WindowInsetsController controller = getWindow().getInsetsController();
-            if (controller != null) {
-                if (statusBarDark) {
-                    // Dark background, light icons
-                    controller.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS);
-                } else {
-                    // Light background, dark icons
-                    controller.setSystemBarsAppearance(
-                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
-                        WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS
-                    );
-                }
-            }
-        } else {
-            View decorView = getWindow().getDecorView();
-            int flags = decorView.getSystemUiVisibility();
-            if (statusBarDark) {
-                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            } else {
-                flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-            }
-            decorView.setSystemUiVisibility(flags);
+        } finally {
+            try {
+                if (reader != null) reader.close();
+                if (inputStream != null) inputStream.close();
+            } catch (Exception ignored) {}
         }
     }
     
@@ -168,59 +132,90 @@ public class MainActivity extends Activity {
         rootLayout.addView(webView);
         rootLayout.addView(progressBar);
         
+        // Set content view BEFORE any window operations
         setContentView(rootLayout);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void setupStatusBar() {
+        try {
+            // Set status bar color
+            int statusBarColor = statusBarDark ? Color.parseColor("#1C1B1F") : Color.parseColor("#F5F5F5");
+            getWindow().setStatusBarColor(statusBarColor);
+            
+            // Set navigation bar color
+            getWindow().setNavigationBarColor(statusBarColor);
+            
+            // Set status bar icon color using deprecated but reliable API
+            View decorView = getWindow().getDecorView();
+            if (decorView != null) {
+                int flags = decorView.getSystemUiVisibility();
+                if (statusBarDark) {
+                    // Dark background, light icons - clear the light flag
+                    flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                } else {
+                    // Light background, dark icons - set the light flag
+                    flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                }
+                decorView.setSystemUiVisibility(flags);
+            }
+        } catch (Exception ignored) {
+            // Ignore any status bar errors - not critical
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
-        WebSettings settings = webView.getSettings();
-        settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
-        settings.setLoadWithOverviewMode(true);
-        settings.setUseWideViewPort(true);
-        settings.setBuiltInZoomControls(true);
-        settings.setDisplayZoomControls(false);
-        settings.setSupportZoom(true);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        if (webView == null) return;
+        
+        try {
+            WebSettings settings = webView.getSettings();
+            settings.setJavaScriptEnabled(true);
+            settings.setDomStorageEnabled(true);
+            settings.setDatabaseEnabled(true);
+            settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+            settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(true);
+            settings.setLoadWithOverviewMode(true);
+            settings.setUseWideViewPort(true);
+            settings.setBuiltInZoomControls(true);
+            settings.setDisplayZoomControls(false);
+            settings.setSupportZoom(true);
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
 
-        webView.setWebViewClient(new WebViewClient() {
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return false;
-            }
-
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                super.onPageStarted(view, url, favicon);
-                if (progressBar != null) {
-                    progressBar.setVisibility(View.VISIBLE);
+            webView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                    super.onPageStarted(view, url, favicon);
+                    if (progressBar != null) {
+                        progressBar.setVisibility(View.VISIBLE);
+                    }
                 }
-            }
 
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                if (progressBar != null) {
-                    progressBar.setVisibility(View.GONE);
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    super.onPageFinished(view, url);
+                    if (progressBar != null) {
+                        progressBar.setVisibility(View.GONE);
+                    }
                 }
-            }
-        });
+            });
 
-        webView.setWebChromeClient(new WebChromeClient() {
-            @Override
-            public void onProgressChanged(WebView view, int newProgress) {
-                if (progressBar != null) {
-                    progressBar.setProgress(newProgress);
+            webView.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onProgressChanged(WebView view, int newProgress) {
+                    if (progressBar != null) {
+                        progressBar.setProgress(newProgress);
+                    }
                 }
-            }
-        });
+            });
+        } catch (Exception ignored) {
+            // Ignore WebView setup errors
+        }
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void onBackPressed() {
         if (webView != null && webView.canGoBack()) {
             webView.goBack();

@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.WindowInsetsController
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -47,6 +48,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Enable high refresh rate (120Hz) for smoother animations
+        enableHighRefreshRate()
 
         apkProcessor = ApkProcessor(applicationContext)
         settingsRepository = SettingsRepository(applicationContext)
@@ -118,26 +122,26 @@ class MainActivity : ComponentActivity() {
                     enterTransition = {
                         slideInHorizontally(
                             initialOffsetX = { fullWidth -> fullWidth },
-                            animationSpec = tween(300)
-                        ) + fadeIn(animationSpec = tween(300))
+                            animationSpec = tween(200)
+                        ) + fadeIn(animationSpec = tween(150))
                     },
                     exitTransition = {
                         slideOutHorizontally(
-                            targetOffsetX = { fullWidth -> -fullWidth / 3 },
-                            animationSpec = tween(300)
-                        ) + fadeOut(animationSpec = tween(300))
+                            targetOffsetX = { fullWidth -> -fullWidth / 4 },
+                            animationSpec = tween(200)
+                        ) + fadeOut(animationSpec = tween(150))
                     },
                     popEnterTransition = {
                         slideInHorizontally(
-                            initialOffsetX = { fullWidth -> -fullWidth / 3 },
-                            animationSpec = tween(300)
-                        ) + fadeIn(animationSpec = tween(300))
+                            initialOffsetX = { fullWidth -> -fullWidth / 4 },
+                            animationSpec = tween(200)
+                        ) + fadeIn(animationSpec = tween(150))
                     },
                     popExitTransition = {
                         slideOutHorizontally(
                             targetOffsetX = { fullWidth -> fullWidth },
-                            animationSpec = tween(300)
-                        ) + fadeOut(animationSpec = tween(300))
+                            animationSpec = tween(200)
+                        ) + fadeOut(animationSpec = tween(150))
                     }
                 ) {
                     composable("home") {
@@ -260,6 +264,39 @@ class MainActivity : ComponentActivity() {
             } else {
                 window.decorView.systemUiVisibility = 
                     window.decorView.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+            }
+        }
+    }
+    
+    /**
+     * Enables high refresh rate (up to 120Hz) for smoother animations.
+     * This ensures the app runs at the device's maximum refresh rate.
+     */
+    private fun enableHighRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+: Request unlimited frame rate
+            window.attributes.layoutInDisplayCutoutMode = 
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Request the highest available refresh rate
+            val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display
+            } else {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay
+            }
+            
+            display?.let { d ->
+                val supportedModes = d.supportedModes
+                val highestRefreshMode = supportedModes.maxByOrNull { it.refreshRate }
+                
+                highestRefreshMode?.let { mode ->
+                    val params = window.attributes
+                    params.preferredDisplayModeId = mode.modeId
+                    window.attributes = params
+                }
             }
         }
     }
