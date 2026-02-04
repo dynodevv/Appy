@@ -45,9 +45,13 @@ class ApkProcessor(private val context: Context) {
     companion object {
         private const val TEMPLATE_APK = "base-web-template.apk"
         private const val CONFIG_FILE = "assets/config.json"
+        private const val MANIFEST_FILE = "AndroidManifest.xml"
         private const val KEYSTORE_FILE = "debug.jks"
         private const val KEYSTORE_PASSWORD = "android"
         private const val KEY_ALIAS = "androiddebugkey"
+        
+        // Template package ID - must match the applicationId in template/build.gradle.kts
+        private const val TEMPLATE_PACKAGE_ID = "com.appy.generated.webapp.placeholder.app"
         
         // Icon sizes for different densities
         private val ICON_SIZES = mapOf(
@@ -161,7 +165,9 @@ class ApkProcessor(private val context: Context) {
     }
 
     /**
-     * Modifies the APK template by injecting the config.json with user's URL and settings
+     * Modifies the APK template by:
+     * 1. Injecting config.json with user's URL and settings
+     * 2. Modifying AndroidManifest.xml to change the package name
      * Uses Zip4j library for ZIP manipulation
      */
     private suspend fun modifyApk(
@@ -195,13 +201,50 @@ class ApkProcessor(private val context: Context) {
                 }
 
                 // Add new config.json
-                val zipParams = ZipParameters().apply {
+                val configParams = ZipParameters().apply {
                     compressionMethod = CompressionMethod.DEFLATE
                     compressionLevel = CompressionLevel.NORMAL
                     fileNameInZip = CONFIG_FILE
                 }
 
-                zipFile.addFile(configFile, zipParams)
+                zipFile.addFile(configFile, configParams)
+                
+                // Modify AndroidManifest.xml to change package name
+                val manifestHeader = zipFile.getFileHeader(MANIFEST_FILE)
+                if (manifestHeader != null) {
+                    // Extract manifest bytes
+                    val manifestBytes = zipFile.getInputStream(manifestHeader).use { it.readBytes() }
+                    
+                    // Modify the package name in the binary manifest
+                    // This will throw if the package name is too long or not found
+                    val modifiedManifest = BinaryManifestModifier.modifyPackageName(
+                        manifestBytes,
+                        TEMPLATE_PACKAGE_ID,
+                        packageId
+                    )
+                    
+                    // Write modified manifest to temp file
+                    val manifestTempFile = File(context.cacheDir, "AndroidManifest.xml")
+                    manifestTempFile.writeBytes(modifiedManifest)
+                    
+                    try {
+                        // Remove old manifest
+                        zipFile.removeFile(MANIFEST_FILE)
+                        
+                        // Add modified manifest - use DEFLATE as original
+                        val manifestParams = ZipParameters().apply {
+                            compressionMethod = CompressionMethod.DEFLATE
+                            compressionLevel = CompressionLevel.NORMAL
+                            fileNameInZip = MANIFEST_FILE
+                        }
+                        
+                        zipFile.addFile(manifestTempFile, manifestParams)
+                    } finally {
+                        manifestTempFile.delete()
+                    }
+                } else {
+                    throw IllegalStateException("AndroidManifest.xml not found in template APK")
+                }
             }
         } finally {
             configFile.delete()

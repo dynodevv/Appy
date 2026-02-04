@@ -8,7 +8,9 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.webtemplate.app"
+        // Use a long placeholder package ID to allow for custom package names up to 50 chars
+        // The binary manifest modification replaces this with the user's package ID
+        applicationId = "com.appy.generated.webapp.placeholder.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1

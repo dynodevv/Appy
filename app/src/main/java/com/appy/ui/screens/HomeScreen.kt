@@ -96,10 +96,18 @@ sealed class BuildState {
 }
 
 /**
+ * Maximum package ID length - must be <= template package ID length
+ * Template uses "com.appy.generated.webapp.placeholder.app" (44 chars)
+ */
+private const val MAX_PACKAGE_ID_LENGTH = 44
+
+/**
  * Validates if a package ID follows Android naming conventions
  */
 private fun isValidPackageId(packageId: String): Boolean {
     if (packageId.isBlank()) return false
+    // Package ID must not exceed maximum length
+    if (packageId.length > MAX_PACKAGE_ID_LENGTH) return false
     // Package ID must have at least two parts separated by dots
     val parts = packageId.split(".")
     if (parts.size < 2) return false
@@ -267,7 +275,14 @@ fun HomeScreen(
                         singleLine = true,
                         isError = packageId.isNotBlank() && !isPackageIdValid,
                         supportingText = if (packageId.isNotBlank() && !isPackageIdValid) {
-                            { Text("Use lowercase letters, numbers, underscores (e.g., com.example.app)") }
+                            { 
+                                Text(
+                                    if (packageId.length > MAX_PACKAGE_ID_LENGTH) 
+                                        "Package ID too long (max $MAX_PACKAGE_ID_LENGTH chars)"
+                                    else 
+                                        "Use lowercase letters, numbers, underscores (e.g., com.example.app)"
+                                ) 
+                            }
                         } else null,
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Ascii,
@@ -341,7 +356,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Note: The launcher name will show as \"WebApp\" due to Android limitations. The app name you enter is used for the filename and shown inside the app.",
+                            text = "Your custom package ID allows multiple apps to be installed. The app name is used for the filename and shown inside the app.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
