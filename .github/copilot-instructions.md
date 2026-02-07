@@ -27,7 +27,7 @@ There are currently no automated tests. Manual testing required:
   - `src/main/java/com/appy/ui/screens/HomeScreen.kt`: Main UI
   - `src/main/java/com/appy/processor/ApkProcessor.kt`: Core APK generation logic
   - `src/main/assets/base-web-template.apk`: Pre-compiled template (auto-copied)
-  - `src/main/assets/debug.p12`: Debug keystore for development (debug credentials only, never for production)
+  - `src/main/assets/debug.p12`: Debug keystore (publicly committed, for development only - never use for production)
 - `template/`: Pure Java WebView template with **ZERO external dependencies**
   - `src/main/java/com/webtemplate/MainActivity.java`: WebView activity
   - `src/main/assets/config.json`: URL configuration placeholder
