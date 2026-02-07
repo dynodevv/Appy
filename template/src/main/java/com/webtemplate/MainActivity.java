@@ -37,6 +37,8 @@ public class MainActivity extends Activity {
     private String targetUrl = "https://example.com";
     private boolean statusBarDark = false;
     private boolean enableOfflineCache = false;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback networkCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -207,14 +209,14 @@ public class MainActivity extends Activity {
 
             // Configure cache mode based on offline cache setting
             if (enableOfflineCache) {
+                // Set initial cache mode based on current connectivity
                 if (isNetworkAvailable()) {
-                    // Online: use default caching which fetches fresh content
-                    // and populates the cache for offline use
                     settings.setCacheMode(WebSettings.LOAD_DEFAULT);
                 } else {
-                    // Offline: use cached content
                     settings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
                 }
+                // Register callback to dynamically switch cache modes
+                registerNetworkCallback();
             } else {
                 settings.setCacheMode(WebSettings.LOAD_DEFAULT);
             }
@@ -303,6 +305,60 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             return false;
         }
+    }
+    
+    /**
+     * Registers a network callback to dynamically switch WebView cache modes
+     * when connectivity changes. This ensures offline caching works even when
+     * the network drops mid-session.
+     */
+    private void registerNetworkCallback() {
+        try {
+            connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (connectivityManager == null) return;
+            
+            networkCallback = new ConnectivityManager.NetworkCallback() {
+                @Override
+                public void onAvailable(android.net.Network network) {
+                    // Network available: load fresh content (HTTP caching still populates cache)
+                    runOnUiThread(() -> {
+                        if (webView != null) {
+                            webView.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                        }
+                    });
+                }
+                
+                @Override
+                public void onLost(android.net.Network network) {
+                    // Network lost: serve cached content even if expired
+                    runOnUiThread(() -> {
+                        if (webView != null) {
+                            webView.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+                        }
+                    });
+                }
+            };
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                connectivityManager.registerDefaultNetworkCallback(networkCallback);
+            } else {
+                android.net.NetworkRequest request = new android.net.NetworkRequest.Builder().build();
+                connectivityManager.registerNetworkCallback(request, networkCallback);
+            }
+        } catch (Exception ignored) {
+            // Fall back to static cache mode if callback registration fails
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        // Unregister network callback to prevent leaks
+        if (connectivityManager != null && networkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(networkCallback);
+            } catch (Exception ignored) {}
+        }
+        super.onDestroy();
     }
 
     @Override

@@ -1,6 +1,5 @@
 package com.appy
 
-import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -9,7 +8,6 @@ import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -210,45 +208,20 @@ class MainActivity : ComponentActivity() {
     
     /**
      * Updates the status bar appearance (icon color) based on the current theme.
-     * For light themes, uses dark icons. For dark themes, uses light icons.
-     * Also sets up appropriate scrim colors for predictive back gesture.
+     * Only updates lightweight system bars appearance flags to avoid blocking
+     * frame rendering and predictive-back gesture animations.
      */
     @Suppress("DEPRECATION")
     private fun updateStatusBarAppearance(isDarkTheme: Boolean) {
-        // Set window background color to match theme for predictive back gesture scrim
-        // This affects the "reveal" color during the back gesture animation
-        if (isDarkTheme) {
-            window.decorView.setBackgroundColor(Color.parseColor("#1C1B1F")) // Dark background
-            window.setNavigationBarColor(Color.parseColor("#1C1B1F"))
-        } else {
-            window.decorView.setBackgroundColor(Color.parseColor("#FEFBFF")) // Light background
-            window.setNavigationBarColor(Color.parseColor("#FEFBFF"))
-        }
-        
-        // Update edge-to-edge with appropriate system bar styles for the theme
-        if (isDarkTheme) {
-            enableEdgeToEdge(
-                statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-                navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
-            )
-        } else {
-            enableEdgeToEdge(
-                statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
-                navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-            )
-        }
-        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let { controller ->
                 if (isDarkTheme) {
-                    // Dark theme: clear the light appearance flag (use light/white icons)
                     controller.setSystemBarsAppearance(
                         0,
                         WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or 
                         WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
                     )
                 } else {
-                    // Light theme: set light appearance flag (use dark icons)
                     controller.setSystemBarsAppearance(
                         WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
                         WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
@@ -258,7 +231,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } else {
-            // For older APIs
             if (isDarkTheme) {
                 window.decorView.systemUiVisibility = 
                     window.decorView.systemUiVisibility and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
