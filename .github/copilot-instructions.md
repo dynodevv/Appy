@@ -177,7 +177,7 @@ At the time of writing, there are no automated tests in this repository. Manual 
 
 ## Known Issues
 
-- Custom icons feature is implemented but not functional: The icon injection code exists in `ApkProcessor.kt` but icons don't appear correctly in the generated APKs. The feature attempts to replace launcher icons at multiple densities (mipmap and drawable folders) but this currently fails. No workaround is available; users cannot currently customize app icons in generated APKs.
+- **Custom icons not functional**: The icon injection feature is implemented in `ApkProcessor.kt` with logic to replace launcher icons at multiple densities (both mipmap and drawable folders), but the icons don't appear correctly in the generated APKs after installation. The APK generation process completes without errors, but the default template icon is displayed instead of the custom icon. The root cause has not been identified. Possible areas to investigate: APK signing after icon modification, resource compilation, or icon format/size compatibility. No workaround is currently available.
 
 ## Important Notes
 
