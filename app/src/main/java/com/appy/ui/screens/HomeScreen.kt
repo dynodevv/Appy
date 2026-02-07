@@ -580,11 +580,11 @@ fun BuildStatusSection(buildState: BuildState) {
     AnimatedContent(
         targetState = buildState,
         transitionSpec = {
-            (fadeIn(animationSpec = tween(150, easing = emphasizedEasing)) +
-                scaleIn(animationSpec = tween(150, easing = emphasizedEasing), initialScale = 0.95f))
+            (fadeIn(animationSpec = tween(250, easing = emphasizedEasing)) +
+                scaleIn(animationSpec = tween(250, easing = emphasizedEasing), initialScale = 0.95f))
                 .togetherWith(
-                    fadeOut(animationSpec = tween(150, easing = emphasizedEasing)) +
-                        scaleOut(animationSpec = tween(150, easing = emphasizedEasing), targetScale = 0.95f)
+                    fadeOut(animationSpec = tween(250, easing = emphasizedEasing)) +
+                        scaleOut(animationSpec = tween(250, easing = emphasizedEasing), targetScale = 0.95f)
                 )
         },
         label = "buildStateTransition"
@@ -602,7 +602,7 @@ fun BuildStatusSection(buildState: BuildState) {
                 ) {
                     val animatedProgress by animateFloatAsState(
                         targetValue = state.progress,
-                        animationSpec = tween(150, easing = emphasizedEasing),
+                        animationSpec = tween(250, easing = emphasizedEasing),
                         label = "progressAnimation"
                     )
 

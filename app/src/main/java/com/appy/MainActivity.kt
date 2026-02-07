@@ -1,5 +1,7 @@
 package com.appy
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -12,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -120,26 +123,26 @@ class MainActivity : ComponentActivity() {
                     enterTransition = {
                         slideInHorizontally(
                             initialOffsetX = { fullWidth -> fullWidth },
-                            animationSpec = tween(150)
-                        ) + fadeIn(animationSpec = tween(100))
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
                     },
                     exitTransition = {
                         slideOutHorizontally(
                             targetOffsetX = { fullWidth -> -fullWidth / 4 },
-                            animationSpec = tween(150)
-                        ) + fadeOut(animationSpec = tween(100))
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing))
                     },
                     popEnterTransition = {
                         slideInHorizontally(
                             initialOffsetX = { fullWidth -> -fullWidth / 4 },
-                            animationSpec = tween(150)
-                        ) + fadeIn(animationSpec = tween(100))
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing))
                     },
                     popExitTransition = {
                         slideOutHorizontally(
                             targetOffsetX = { fullWidth -> fullWidth },
-                            animationSpec = tween(150)
-                        ) + fadeOut(animationSpec = tween(100))
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ) + fadeOut(animationSpec = tween(300, easing = FastOutSlowInEasing))
                     }
                 ) {
                     composable("home") {
@@ -208,11 +211,17 @@ class MainActivity : ComponentActivity() {
     
     /**
      * Updates the status bar appearance (icon color) based on the current theme.
-     * Only updates lightweight system bars appearance flags to avoid blocking
-     * frame rendering and predictive-back gesture animations.
+     * Sets window background drawable for correct predictive-back gesture reveal color,
+     * and updates system bar icon appearance flags.
      */
     @Suppress("DEPRECATION")
     private fun updateStatusBarAppearance(isDarkTheme: Boolean) {
+        // Set window background for predictive-back gesture reveal color.
+        // Uses window.setBackgroundDrawable() which is lighter weight than
+        // decorView.setBackgroundColor() (doesn't trigger full DecorView layout).
+        val bgColor = if (isDarkTheme) Color.parseColor("#1C1B1F") else Color.parseColor("#FEFBFF")
+        window.setBackgroundDrawable(ColorDrawable(bgColor))
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let { controller ->
                 if (isDarkTheme) {

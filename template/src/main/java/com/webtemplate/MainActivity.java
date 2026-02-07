@@ -23,6 +23,7 @@ import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
@@ -58,7 +59,18 @@ public class MainActivity extends Activity {
         
         // Load URL
         if (webView != null && targetUrl != null) {
-            webView.loadUrl(targetUrl);
+            if (enableOfflineCache && !isNetworkAvailable()) {
+                // Offline: try loading saved web archive first
+                File archive = getArchiveFile();
+                if (archive.exists()) {
+                    webView.loadUrl("file://" + archive.getAbsolutePath());
+                } else {
+                    // No archive saved yet, try loading URL with cache fallback
+                    webView.loadUrl(targetUrl);
+                }
+            } else {
+                webView.loadUrl(targetUrl);
+            }
         }
     }
     
@@ -266,6 +278,12 @@ public class MainActivity extends Activity {
                     if (progressBar != null) {
                         progressBar.setVisibility(View.GONE);
                     }
+                    // Save web archive for offline use after page loads
+                    if (enableOfflineCache && isNetworkAvailable()) {
+                        try {
+                            view.saveWebArchive(getArchiveFile().getAbsolutePath());
+                        } catch (Exception ignored) {}
+                    }
                 }
             });
 
@@ -280,6 +298,13 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
             // Ignore WebView setup errors
         }
+    }
+    
+    /**
+     * Returns the file path for the offline web archive.
+     */
+    private File getArchiveFile() {
+        return new File(getFilesDir(), "offline_page.mht");
     }
     
     /**
