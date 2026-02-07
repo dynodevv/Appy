@@ -33,7 +33,7 @@ Appy uses a two-module architecture with binary template modification:
 5. Final APK is saved to device storage for installation
 
 **Important Constants:**
-- Template package ID: `com.appy.generated.webapp.placeholder.app` (50 chars placeholder)
+- Template package ID: `com.appy.generated.webapp.placeholder.app` (41 chars, allowing custom package names)
 - Template app name: `AppyGeneratedWebApplicationPlaceholderNameHere`
 - Debug keystore: `debug.p12`, password: `android`, alias: `androiddebugkey`
 
@@ -177,7 +177,7 @@ At the time of writing, there are no automated tests in this repository. Manual 
 
 ## Known Issues
 
-- Custom icons don't work properly: The icon injection feature is implemented but icons may not display correctly at all densities in the generated APKs
+- Custom icons feature is implemented but not functional: The icon injection code exists in `ApkProcessor.kt` but icons don't appear correctly in the generated APKs. The feature attempts to replace launcher icons at multiple densities (mipmap and drawable folders) but this currently fails. No workaround is available; users cannot currently customize app icons in generated APKs.
 
 ## Important Notes
 
