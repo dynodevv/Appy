@@ -208,8 +208,9 @@ public class MainActivity extends Activity {
             // Configure cache mode based on offline cache setting
             if (enableOfflineCache) {
                 if (isNetworkAvailable()) {
-                    // Online: always load from network to get fresh content
-                    settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+                    // Online: use default caching which fetches fresh content
+                    // and populates the cache for offline use
+                    settings.setCacheMode(WebSettings.LOAD_DEFAULT);
                 } else {
                     // Offline: use cached content
                     settings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
