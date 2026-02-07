@@ -183,7 +183,7 @@ At the time of writing, there are no automated tests in this repository. Manual 
 
 - The template module MUST remain pure Java with zero dependencies
 - Template APK is automatically built before the main app via `copyTemplateApk` task
-- Template package ID is a long placeholder (50 chars) to allow custom package names up to 50 chars
+- Template package ID is a 41-character placeholder to allow custom package names
 - Binary manifest modification replaces the placeholder with user's package ID
 - Config is injected via `assets/config.json` with manual JSON parsing (no Gson/Moshi)
 - APKs are signed with debug keystore in debug builds, release keystore in release builds
